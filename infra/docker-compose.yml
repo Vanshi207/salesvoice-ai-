@@ -8,6 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: salesvoice
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      LEADS_DB_PASSWORD: ${LEADS_DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
@@ -41,6 +42,22 @@ services:
       retries: 5
     restart: unless-stopped
 
+  leads:
+    build:
+      context: ..
+      dockerfile: services/leads/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://leads_svc:${LEADS_DB_PASSWORD}@postgres:5432/salesvoice
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
   gateway:
     build:
       context: ..
@@ -49,6 +66,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://redis:6379/0
       AUTH_URL: http://auth:8000
+      LEADS_URL: http://leads:8000
       FRONTEND_ORIGIN: http://localhost:3000
     ports:
       - "8000:8000"
@@ -56,6 +74,8 @@ services:
       redis:
         condition: service_healthy
       auth:
+        condition: service_healthy
+      leads:
         condition: service_healthy
     restart: unless-stopped
 

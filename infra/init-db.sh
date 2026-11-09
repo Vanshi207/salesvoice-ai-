@@ -7,4 +7,8 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 CREATE ROLE auth_svc LOGIN PASSWORD '${AUTH_DB_PASSWORD}';
 CREATE SCHEMA auth AUTHORIZATION auth_svc;
 ALTER ROLE auth_svc SET search_path = auth;
+
+CREATE ROLE leads_svc LOGIN PASSWORD '${LEADS_DB_PASSWORD}';
+CREATE SCHEMA leads AUTHORIZATION leads_svc;
+ALTER ROLE leads_svc SET search_path = leads;
 SQL
