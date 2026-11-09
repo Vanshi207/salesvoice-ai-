@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
   "pydantic-settings>=2.6",
   "pyjwt>=2.9",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30",
 ]
 
 [build-system]
