@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL
+CREATE EXTENSION IF NOT EXISTS vector;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+
+CREATE ROLE auth_svc LOGIN PASSWORD '${AUTH_DB_PASSWORD}';
+CREATE SCHEMA auth AUTHORIZATION auth_svc;
+ALTER ROLE auth_svc SET search_path = auth;
+SQL
