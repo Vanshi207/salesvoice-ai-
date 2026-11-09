@@ -11,4 +11,9 @@ ALTER ROLE auth_svc SET search_path = auth;
 CREATE ROLE leads_svc LOGIN PASSWORD '${LEADS_DB_PASSWORD}';
 CREATE SCHEMA leads AUTHORIZATION leads_svc;
 ALTER ROLE leads_svc SET search_path = leads;
+
+CREATE ROLE knowledge_svc LOGIN PASSWORD '${KNOWLEDGE_DB_PASSWORD}';
+CREATE SCHEMA knowledge AUTHORIZATION knowledge_svc;
+GRANT USAGE ON SCHEMA public TO knowledge_svc;
+ALTER ROLE knowledge_svc SET search_path = knowledge;
 SQL
