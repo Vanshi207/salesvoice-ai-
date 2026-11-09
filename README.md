@@ -6,7 +6,7 @@ An AI-powered sales coaching platform built with a microservices architecture. I
 
 ```bash
 # Clone and start everything (Docker Desktop required)
-git clone https://github.com/Vanshi207/salesvoice-ai.git
+git clone https://github.com/Vanshi207/salesvoice-ai-.git
 cd salesvoice-ai
 cp .env.example .env        # then fill in real secrets
 docker compose -f infra/docker-compose.yml --env-file .env up --build -d
