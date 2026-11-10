@@ -23,6 +23,8 @@ async def lifespan(app: FastAPI):
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     consumer = asyncio.create_task(
         consume(redis, "events", group="leads", consumer=socket.gethostname(), handler=handle))
+    consumer.add_done_callback(
+        lambda t: t.cancelled() or log.error(f"event consumer stopped: {t.exception()!r}"))
     yield
     consumer.cancel()
     with suppress(asyncio.CancelledError):
