@@ -8,12 +8,21 @@ from sqlalchemy.pool import NullPool
 
 from salesvoice_common import events
 
-from app import storage, stt
+from app import llm, storage, stt
 from app.config import settings
 from app.metrics import compute_metrics
-from app.models import Call, Segment
+from app.models import Analysis, Call, Segment
 
 log = logging.getLogger("pipeline")
+
+
+def mmss(seconds: float) -> str:
+    return f"{int(seconds // 60):02d}:{int(seconds % 60):02d}"
+
+
+def format_transcript(segments: list[Segment], rep_speaker: int) -> str:
+    return "\n".join(f"[{mmss(seg.start_s)}] {'REP' if seg.speaker == rep_speaker else 'CUSTOMER'}: {seg.text}"
+                     for seg in segments)
 
 
 def open_db():
@@ -47,11 +56,30 @@ async def run(s: AsyncSession, redis: Redis, call_id: str) -> None:
     call.languages = ",".join(transcript.languages) or None
     call.rep_speaker = call.segments[0].speaker
 
-    # 2. Metrics (plain Python)
+    # 2. Metrics (plain Python) + 3. LLM analysis
+    await set_status(s, call, "analyzing")
     metrics = compute_metrics(call.segments, call.rep_speaker, transcript.duration)
-    log.info(f"call {call.id} metrics: {metrics}")
-    await set_status(s, call, "done")
-    # 3D: LLM analysis goes here, then events.publish
+    result = await llm.analyze(format_transcript(call.segments, call.rep_speaker), metrics)
+
+    # 4. Save (update if it exists, so a retry never duplicates)
+    fields = dict(summary=result.summary, sentiment=result.sentiment, intent=result.intent,
+                  lead_score=result.lead_score, result=result.model_dump(), metrics=metrics,
+                  llm_model=llm.model_name())
+    if call.analysis:
+        for k, v in fields.items():
+            setattr(call.analysis, k, v)
+    else:
+        call.analysis = Analysis(**fields)
+    call.status, call.error = "done", None
+    await s.commit()
+    log.info(f"call {call.id} -> done (score {result.lead_score})")
+
+    # 5. Tell the rest of the system
+    await events.publish(redis, settings.events_stream, "call.analyzed", {
+        "call_id": call.id, "lead_id": call.lead_id, "owner_id": call.owner_id,
+        "lead_score": result.lead_score, "intent": result.intent, "sentiment": result.sentiment,
+        "follow_up_requested": result.follow_up_requested,
+    })
 
 
 async def mark_failed(call_id: str, error: str) -> None:
