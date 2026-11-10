@@ -78,7 +78,7 @@ function UploadDoc({ onUploaded }: { onUploaded: () => void }) {
   }
 
   return (
-    <Card title="Upload a document (admins)">
+    <Card title="Upload a document">
       <div className="flex items-center gap-2">
         <input key={inputKey} type="file" accept=".pdf,.txt,.md" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
         <input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />

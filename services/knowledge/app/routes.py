@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from salesvoice_common.auth_deps import CurrentUser, admin_only, current_user
+from salesvoice_common.auth_deps import CurrentUser, current_user
 
 from app.chunking import chunk_text
 from app.config import settings
@@ -19,7 +19,6 @@ router = APIRouter()
 async def upload_document(file: UploadFile = File(...), title: str | None = Form(default=None),
                           user: CurrentUser = Depends(current_user),
                           s: AsyncSession = Depends(db.session)):
-    admin_only(user)
     filename = file.filename or "upload"
     if not any(filename.lower().endswith(ext) for ext in ALLOWED):
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"Allowed: {sorted(ALLOWED)}")
@@ -54,7 +53,6 @@ async def list_documents(user: CurrentUser = Depends(current_user), s: AsyncSess
 @router.delete("/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(doc_id: str, user: CurrentUser = Depends(current_user),
                           s: AsyncSession = Depends(db.session)):
-    admin_only(user)
     doc = await s.get(Document, doc_id)
     if not doc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
