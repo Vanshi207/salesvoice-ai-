@@ -1,0 +1,7 @@
+services:
+  leads:
+    ports: ["127.0.0.1:8101:8000"]
+  knowledge:
+    ports: ["127.0.0.1:8102:8000"]
+  calls:
+    ports: ["127.0.0.1:8103:8000"]

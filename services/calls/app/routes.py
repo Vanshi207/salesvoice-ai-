@@ -30,8 +30,11 @@ async def get_call_for(call_id: str, user: CurrentUser, s: AsyncSession, full: b
 
 @router.post("/calls", response_model=CallOut, status_code=status.HTTP_202_ACCEPTED)
 async def upload_call(file: UploadFile = File(...), lead_id: str = Form(...),
+                      source: str = Form(default="upload"),
                       user: CurrentUser = Depends(current_user),
                       s: AsyncSession = Depends(db.session)):
+    if source not in ("upload", "agent"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "source must be 'upload' or 'agent'")
     filename = file.filename or "call"
     if storage.extension(filename) not in storage.ALLOWED:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"Allowed: {sorted(storage.ALLOWED)}")
@@ -45,7 +48,7 @@ async def upload_call(file: UploadFile = File(...), lead_id: str = Form(...),
     except httpx.HTTPError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Leads service unavailable")
 
-    call = Call(lead_id=lead_id, owner_id=user.id, filename=filename, size_bytes=len(data), audio_path="")
+    call = Call(lead_id=lead_id, owner_id=user.id, source=source, filename=filename, size_bytes=len(data), audio_path="")
     s.add(call)
     await s.flush()
     call.audio_path = storage.save(call.id, filename, data)

@@ -1,0 +1,2 @@
+-r requirements.txt
+pipecat-ai[webrtc,runner]==1.15.0
