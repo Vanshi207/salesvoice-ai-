@@ -1,5 +1,15 @@
 name: salesvoice
 
+x-calls-env: &calls-env
+  DATABASE_URL: postgresql+asyncpg://calls_svc:${CALLS_DB_PASSWORD}@postgres:5432/salesvoice
+  REDIS_URL: redis://redis:6379/0
+  LEADS_URL: http://leads:8000
+  DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY}
+  LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+  GEMINI_API_KEY: ${GEMINI_API_KEY}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -10,6 +20,7 @@ services:
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
       LEADS_DB_PASSWORD: ${LEADS_DB_PASSWORD}
       KNOWLEDGE_DB_PASSWORD: ${KNOWLEDGE_DB_PASSWORD}
+      CALLS_DB_PASSWORD: ${CALLS_DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
@@ -50,8 +61,11 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://leads_svc:${LEADS_DB_PASSWORD}@postgres:5432/salesvoice
       JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -76,6 +90,39 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  calls:
+    build:
+      context: ..
+      dockerfile: services/calls/Dockerfile
+    environment: *calls-env
+    volumes:
+      - audio:/data/audio
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      leads:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
+  calls-worker:
+    build:
+      context: ..
+      dockerfile: services/calls/Dockerfile
+    command: celery -A app.worker worker --loglevel=INFO --concurrency=2
+    environment: *calls-env
+    volumes:
+      - audio:/data/audio
+    depends_on:
+      calls:
+        condition: service_healthy
+    restart: unless-stopped
+
   gateway:
     build:
       context: ..
@@ -86,6 +133,7 @@ services:
       AUTH_URL: http://auth:8000
       LEADS_URL: http://leads:8000
       KNOWLEDGE_URL: http://knowledge:8000
+      CALLS_URL: http://calls:8000
       FRONTEND_ORIGIN: http://localhost:3000
     ports:
       - "8000:8000"
@@ -98,7 +146,10 @@ services:
         condition: service_healthy
       knowledge:
         condition: service_healthy
+      calls:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   pgdata:
+  audio:
